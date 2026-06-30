@@ -34,8 +34,14 @@ class AcceptSDKTokenInterface: AcceptSDKBaseInterface {
     }
     
     fileprivate func handleResponse(_ response:Dictionary<String, AnyObject>,successHandler:(_ isSuccess:Bool)->(),failureHandler:(_ isSuccess:Bool)->()) {
-        let messagesDict = response[AcceptSDKResponse.kMessagesKey]
-        let statusCode = messagesDict![AcceptSDKResponse.kResultCodeKey] as? String
+        // SECURITY (AISAST-c786c978): Use optional binding instead of force-unwrap
+        // to prevent app crash when a (potentially MitM-injected) response omits
+        // the 'messages' key. Force-unwrap of nil is a Swift runtime trap.
+        guard let messagesDict = response[AcceptSDKResponse.kMessagesKey] as? Dictionary<String, AnyObject> else {
+            failureHandler(false)
+            return
+        }
+        let statusCode = messagesDict[AcceptSDKResponse.kResultCodeKey] as? String
         if  statusCode == AcceptSDKResponse.kResultCodeOkValueKey {
             successHandler(true)
         } else if statusCode == AcceptSDKResponse.kResultCodeErrorValueKey {
