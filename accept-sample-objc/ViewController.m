@@ -133,7 +133,11 @@
     request.securePaymentContainerRequest.webCheckOutDataType.token.cardCode = self.cardVerificationCode;
     
     [handler getTokenWithRequest:request successHandler:^(AcceptSDKTokenResponse * _Nonnull inResponse) {
-        NSLog(@"success %@", inResponse.getOpaqueData.getDataValue);
+        // SECURITY: Do not log the opaque payment token — it is a single-use
+        // payment nonce that can be used to charge the customer's card.
+        // Logging it exposes payment data via Xcode console, sysdiagnose
+        // bundles, MDM-collected diagnostics, and pre-iOS-10 system logs.
+        NSLog(@"Tokenization success: resultCode=%@", [[inResponse getMessages] getResultCode]);
         [self updateTokenButton:true];
         [self.activityIndicatorAcceptSDKDemo stopAnimating];
         NSString *output = [NSString stringWithFormat:@"Response: %@\nData Value: %@ \nDescription: %@", [[inResponse getMessages] getResultCode], [[inResponse getOpaqueData] getDataValue], [[inResponse getOpaqueData] getDataDescriptor]];
@@ -143,7 +147,10 @@
     } failureHandler:^(AcceptSDKErrorResponse * _Nonnull inError) {
         //do something
         Message *msg = [[inError getMessages] getMessages][0];
-        NSLog(@"failed...%@", [msg getText]);
+        // SECURITY: Do not log raw server error text — error messages may
+        // contain sensitive context (card details, account info, internal
+        // server state). Log only the structured error code.
+        NSLog(@"Tokenization failed: errorCode=%@", [msg getCode]);
         [self updateTokenButton:true];
         [self.activityIndicatorAcceptSDKDemo stopAnimating];
         
