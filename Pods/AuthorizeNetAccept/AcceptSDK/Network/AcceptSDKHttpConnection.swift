@@ -33,11 +33,26 @@ class HttpConnection{
             let response : HTTPResponse = self.http!.request(request)
             
             self.responseQueue.async(execute: {
-                if response.error != nil {
-                    failure(response.error!)
-                }
-                else {
-                    success(response.body!)
+                // SECURITY (AISAST-10660): Use optional binding for both
+                // response.error and response.body. Both are server-controlled
+                // (error is constructed from server HTTP status; body is the
+                // parsed response dictionary). Force-unwrapping either would
+                // crash the host app under MitM preconditions:
+                //   - response.error! traps if the success path forgot to set
+                //     error before invoking failure
+                //   - response.body! traps when deserializeData() returned nil
+                //     (e.g. MitM-injected top-level JSON array, scalar, or
+                //     non-dictionary response)
+                if let err = response.error {
+                    failure(err)
+                } else if let body = response.body {
+                    success(body)
+                } else {
+                    failure(NSError(
+                        domain: "MalformedResponseBody",
+                        code: HTTPErrorResponseCode.apiErrorResponseCode,
+                        userInfo: [NSLocalizedDescriptionKey:
+                            "Response body was nil or not a JSON object."]))
                 }
             })
         })

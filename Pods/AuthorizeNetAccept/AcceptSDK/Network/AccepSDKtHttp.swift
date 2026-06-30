@@ -100,15 +100,33 @@ class HTTP: NSObject, URLSessionDelegate {
                 httpResponse.error = error as NSError?
             }
             else if let castedResponse = response as? HTTPURLResponse {
-                let bodyDict = self.deserializeData(taskData!)
+                // SECURITY (AISAST-10660): Guard server-controlled inputs to
+                // prevent app crash on MitM-injected or malformed responses.
+                // taskData can be nil on legitimate empty responses; treat that
+                // as a transport failure rather than crashing the host app.
+                guard let safeData = taskData else {
+                    httpResponse.error = NSError(domain: "EmptyResponseBody",
+                        code: castedResponse.statusCode, userInfo: nil)
+                    semaphore.signal()
+                    return
+                }
+                let bodyDict = self.deserializeData(safeData)
                 
                 if HTTPStatusCode.kHTTPSuccessCode == castedResponse.statusCode || HTTPStatusCode.kHTTPCreationSuccessCode == castedResponse.statusCode {
                     httpResponse.body = bodyDict
                 } else {
-                    let (errorMessage) = self.getErrorResponse(bodyDict!)
-                    if let message = errorMessage {
-                        httpResponse.error = NSError(domain: message, code: castedResponse.statusCode, userInfo:[NSLocalizedDescriptionKey:message,HTTPErrorResponseCode.kErrorDictionaryKey:bodyDict!])
-                    }else {
+                    // SECURITY (AISAST-10660): Use optional binding instead of
+                    // force-unwrap. deserializeData() can legitimately return nil
+                    // on malformed/non-dictionary JSON; force-unwrapping that
+                    // would crash the host app under MitM preconditions.
+                    if let safeBodyDict = bodyDict {
+                        let (errorMessage) = self.getErrorResponse(safeBodyDict)
+                        if let message = errorMessage {
+                            httpResponse.error = NSError(domain: message, code: castedResponse.statusCode, userInfo:[NSLocalizedDescriptionKey:message,HTTPErrorResponseCode.kErrorDictionaryKey:safeBodyDict])
+                        } else {
+                            httpResponse.error = NSError(domain: "BadResponse", code: castedResponse.statusCode, userInfo:nil)
+                        }
+                    } else {
                         httpResponse.error = NSError(domain: "BadResponse", code: castedResponse.statusCode, userInfo:nil)
                     }
                 }
@@ -138,15 +156,20 @@ class HTTP: NSObject, URLSessionDelegate {
     }
     
     fileprivate func deserializeData (_ data : Data) -> Dictionary<String, AnyObject>? {
-        var jsonDict:Dictionary<String, AnyObject> = [:]
-        do{
-            jsonDict = try JSONSerialization.jsonObject(with: data, options: JSONSerialization.ReadingOptions.mutableContainers) as! Dictionary<String, AnyObject>
+        // SECURITY (AISAST-10660): Use conditional cast (as?) instead of forced
+        // downcast (as!). A forced downcast is a Swift runtime trap (NOT a
+        // throw), so the surrounding catch block CANNOT catch it — a
+        // MitM-injected response containing a valid top-level JSON array,
+        // scalar, or null would crash the host app before any other handler
+        // runs. Returning nil on type mismatch lets callers handle the
+        // malformed-response case gracefully.
+        do {
+            let parsed = try JSONSerialization.jsonObject(with: data,
+                options: JSONSerialization.ReadingOptions.mutableContainers)
+            return parsed as? Dictionary<String, AnyObject>
+        } catch _ as NSError {
+            return nil
         }
-        catch _ as NSError{
-            //todo handle error
-        }
-        return jsonDict
-        
     }
 }
 
