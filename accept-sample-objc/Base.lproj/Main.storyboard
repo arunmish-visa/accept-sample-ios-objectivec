@@ -114,13 +114,13 @@
                                 <color key="textColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <nil key="highlightedColor"/>
                             </label>
-                            <textField opaque="NO" clipsSubviews="YES" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="line" placeholder="Card Number" textAlignment="center" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="eHU-2A-J2n">
+                            <textField opaque="NO" clipsSubviews="YES" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="line" placeholder="Card Number" textAlignment="center" minimumFontSize="17" secureTextEntry="YES" translatesAutoresizingMaskIntoConstraints="NO" id="eHU-2A-J2n">
                                 <rect key="frame" x="16" y="105" width="343" height="40"/>
                                 <constraints>
                                     <constraint firstAttribute="height" constant="40" id="oKQ-2d-BQe"/>
                                 </constraints>
                                 <fontDescription key="fontDescription" type="system" pointSize="15"/>
-                                <textInputTraits key="textInputTraits" keyboardType="numberPad" enablesReturnKeyAutomatically="YES"/>
+                                <textInputTraits key="textInputTraits" autocapitalizationType="none" autocorrectionType="no" spellCheckingType="no" keyboardType="numberPad" enablesReturnKeyAutomatically="YES"/>
                                 <variation key="default">
                                     <mask key="constraints">
                                         <exclude reference="oKQ-2d-BQe"/>
@@ -199,7 +199,7 @@
                                     <outlet property="delegate" destination="BYZ-38-t0r" id="jik-Pa-1GY"/>
                                 </connections>
                             </textField>
-                            <textField opaque="NO" clipsSubviews="YES" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="line" placeholder="CVV" textAlignment="center" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="Kvi-FO-XlV">
+                            <textField opaque="NO" clipsSubviews="YES" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="line" placeholder="CVV" textAlignment="center" minimumFontSize="17" secureTextEntry="YES" translatesAutoresizingMaskIntoConstraints="NO" id="Kvi-FO-XlV">
                                 <rect key="frame" x="251" y="191" width="108" height="40"/>
                                 <constraints>
                                     <constraint firstAttribute="width" constant="97" id="8Ja-4E-LOH">
@@ -208,7 +208,7 @@
                                     <constraint firstAttribute="height" constant="40" id="fym-P0-fYZ"/>
                                 </constraints>
                                 <fontDescription key="fontDescription" type="system" pointSize="15"/>
-                                <textInputTraits key="textInputTraits" keyboardType="numberPad" enablesReturnKeyAutomatically="YES"/>
+                                <textInputTraits key="textInputTraits" autocapitalizationType="none" autocorrectionType="no" spellCheckingType="no" keyboardType="numberPad" enablesReturnKeyAutomatically="YES"/>
                                 <variation key="default">
                                     <mask key="constraints">
                                         <exclude reference="8Ja-4E-LOH"/>
