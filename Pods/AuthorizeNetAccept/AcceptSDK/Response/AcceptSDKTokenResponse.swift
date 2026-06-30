@@ -20,8 +20,10 @@ struct AcceptSDKTokenResponseKeys {
 }
 
 open class AcceptSDKTokenResponse: NSObject {
-    fileprivate var opaqueData:OpaqueData!
-    fileprivate var messages:Messages!
+    // SECURITY (AISAST-10660): Storage stays nilable so absent keys in a
+    // MitM-injected response do not produce a non-nil-but-uninitialized IUO.
+    fileprivate var opaqueData: OpaqueData?
+    fileprivate var messages: Messages?
     
     @objc convenience init(inDict:Dictionary<String,AnyObject>) {
         self.init()
@@ -35,11 +37,15 @@ open class AcceptSDKTokenResponse: NSObject {
         }
     }
     
-    @objc open func getOpaqueData() -> OpaqueData {
+    // SECURITY (AISAST-10660): Return optionals so callers must nil-check.
+    // The previous IUO return type silently trapped on absent server fields.
+    // Obj-C consumers see this as a nullable pointer (NS_REFINED_FOR_SWIFT
+    // not needed — the @objc bridge handles nullability automatically).
+    @objc open func getOpaqueData() -> OpaqueData? {
         return self.opaqueData
     }
     
-    @objc open func getMessages() -> Messages {
+    @objc open func getMessages() -> Messages? {
         return self.messages
     }
 }
@@ -59,17 +65,21 @@ open class OpaqueData: NSObject {
         }
     }
 
-    @objc open func getDataDescriptor()->String {
-        return self.dataDescriptor!
+    // SECURITY (AISAST-10660): Return optionals. Storage already used '?'
+    // but the getters force-unwrapped, which trapped on absent server keys.
+    @objc open func getDataDescriptor() -> String? {
+        return self.dataDescriptor
     }
     
-    @objc open func getDataValue() -> String {
-        return self.dataValue!
+    @objc open func getDataValue() -> String? {
+        return self.dataValue
     }
 }
 
 open class Messages: NSObject {
-    fileprivate var resultCode: String!
+    // SECURITY (AISAST-10660): Storage stays nilable so absent keys don't
+    // produce a non-nil-but-uninitialized IUO.
+    fileprivate var resultCode: String?
     fileprivate var messages: Array<Message> = []
     
     @objc convenience init (inDict:Dictionary<String,AnyObject>) {
@@ -128,7 +138,9 @@ open class Messages: NSObject {
         self.messages.append(withMessage)
     }
 
-    @objc open func getResultCode() -> String {
+    // SECURITY (AISAST-10660): Return optional. A MitM-injected response
+    // omitting 'resultCode' would otherwise trap via the IUO read.
+    @objc open func getResultCode() -> String? {
         return self.resultCode
     }
     
@@ -138,8 +150,10 @@ open class Messages: NSObject {
 }
 
 open class Message: NSObject {
-    fileprivate var code:String!
-    fileprivate var text:String!
+    // SECURITY (AISAST-10660): Storage stays nilable; getters return
+    // optionals so callers must nil-check.
+    fileprivate var code: String?
+    fileprivate var text: String?
     
     @objc convenience init (inDict:Dictionary<String,AnyObject>) {
         self.init()
@@ -181,11 +195,14 @@ open class Message: NSObject {
         self.text = inErrorMessage
     }
 
-    @objc open func getCode() -> String {
+    // SECURITY (AISAST-10660): Return optionals. A MitM-injected error
+    // response omitting 'code' or 'text' would otherwise trap via the
+    // IUO read.
+    @objc open func getCode() -> String? {
         return self.code
     }
     
-    @objc open func getText() -> String {
+    @objc open func getText() -> String? {
         return self.text
     }
 }

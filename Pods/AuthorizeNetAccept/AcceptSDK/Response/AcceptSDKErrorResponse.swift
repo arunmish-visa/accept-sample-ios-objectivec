@@ -9,7 +9,10 @@
 import Foundation
 
 open class AcceptSDKErrorResponse: NSObject {
-    fileprivate var messages:Messages!
+    // SECURITY (AISAST-10660): Storage stays nilable so absent keys in a
+    // MitM-injected error response do not produce a non-nil-but-uninitialized
+    // IUO. The getter returns optional so callers must nil-check.
+    fileprivate var messages: Messages?
     
     @objc convenience init(inDict:Dictionary<String,AnyObject>) {
         self.init()
@@ -39,7 +42,7 @@ open class AcceptSDKErrorResponse: NSObject {
         self.messages = Messages(withMessage: withMessage)
     }
 
-    @objc open func getMessages() -> Messages {
+    @objc open func getMessages() -> Messages? {
         return self.messages
     }
 }

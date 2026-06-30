@@ -133,28 +133,64 @@
     request.securePaymentContainerRequest.webCheckOutDataType.token.cardCode = self.cardVerificationCode;
     
     [handler getTokenWithRequest:request successHandler:^(AcceptSDKTokenResponse * _Nonnull inResponse) {
+        // SECURITY (AISAST-10660): App-owned defensive parsing. The SDK's
+        // response model uses implicitly-unwrapped-optionals (IUOs) for
+        // server-controlled fields — invoking the getters on a MitM-injected
+        // response that omits 'opaqueData', 'messages.message', etc. would
+        // trap. This block lives in APP-OWNED code (not Pods/), so it
+        // survives `pod install` and shields the host app even if the
+        // SDK regenerates from upstream ~>0.3.0.
+        Messages *messages = [inResponse getMessages];
+        NSString *resultCode = messages ? [messages getResultCode] : nil;
+        OpaqueData *opaqueData = [inResponse getOpaqueData];
+        NSString *dataValue = opaqueData ? [opaqueData getDataValue] : nil;
+        NSString *dataDescriptor = opaqueData ? [opaqueData getDataDescriptor] : nil;
+
+        if (!resultCode || !opaqueData || !dataValue || !dataDescriptor) {
+            // MitM or malformed response — refuse to render token output.
+            NSLog(@"Tokenization success: resultCode=%@ (malformed payload — opaqueData missing)", resultCode ?: @"<nil>");
+            [self updateTokenButton:true];
+            [self.activityIndicatorAcceptSDKDemo stopAnimating];
+            self.textViewShowResults.text = @"Response received but payload was malformed (missing opaqueData). Tokenization aborted.";
+            self.textViewShowResults.textColor = [UIColor redColor];
+            return;
+        }
+
         // SECURITY: Do not log the opaque payment token — it is a single-use
         // payment nonce that can be used to charge the customer's card.
         // Logging it exposes payment data via Xcode console, sysdiagnose
         // bundles, MDM-collected diagnostics, and pre-iOS-10 system logs.
-        NSLog(@"Tokenization success: resultCode=%@", [[inResponse getMessages] getResultCode]);
+        NSLog(@"Tokenization success: resultCode=%@", resultCode);
         [self updateTokenButton:true];
         [self.activityIndicatorAcceptSDKDemo stopAnimating];
-        NSString *output = [NSString stringWithFormat:@"Response: %@\nData Value: %@ \nDescription: %@", [[inResponse getMessages] getResultCode], [[inResponse getOpaqueData] getDataValue], [[inResponse getOpaqueData] getDataDescriptor]];
+        NSString *output = [NSString stringWithFormat:@"Response: %@\nData Value: %@ \nDescription: %@", resultCode, dataValue, dataDescriptor];
         self.textViewShowResults.text = output;
         self.textViewShowResults.textColor = [UIColor greenColor];
 
     } failureHandler:^(AcceptSDKErrorResponse * _Nonnull inError) {
-        //do something
-        Message *msg = [[inError getMessages] getMessages][0];
+        // SECURITY (AISAST-10660): App-owned defensive parsing. The SDK's
+        // failure response can carry an empty messages array under MitM
+        // preconditions; indexing [0] on an empty NSArray raises
+        // NSRangeException (Objective-C runtime exception, not a Swift
+        // trap — still crashes the app). Bounds-check before subscript.
+        Messages *messagesObj = [inError getMessages];
+        NSArray<Message *> *messageArr = messagesObj ? [messagesObj getMessages] : nil;
+        NSString *resultCode = messagesObj ? [messagesObj getResultCode] : nil;
+        Message *firstMsg = (messageArr.count > 0) ? messageArr[0] : nil;
+        NSString *errorCode = firstMsg ? [firstMsg getCode] : nil;
+        NSString *errorText = firstMsg ? [firstMsg getText] : nil;
+
         // SECURITY: Do not log raw server error text — error messages may
         // contain sensitive context (card details, account info, internal
         // server state). Log only the structured error code.
-        NSLog(@"Tokenization failed: errorCode=%@", [msg getCode]);
+        NSLog(@"Tokenization failed: errorCode=%@", errorCode ?: @"<malformed>");
         [self updateTokenButton:true];
         [self.activityIndicatorAcceptSDKDemo stopAnimating];
-        
-        NSString *output = [NSString stringWithFormat:@"Response:  %@\nError code: %@\nError text:   %@", [[inError getMessages] getResultCode], [[[[inError getMessages] getMessages] objectAtIndex:0] getCode], [[[[inError getMessages] getMessages] objectAtIndex:0] getText]];
+
+        NSString *output = [NSString stringWithFormat:@"Response:  %@\nError code: %@\nError text:   %@",
+                            resultCode ?: @"<nil>",
+                            errorCode ?: @"<no error array — possible MitM>",
+                            errorText ?: @"<no error array — possible MitM>"];
         self.textViewShowResults.text = output;
         self.textViewShowResults.textColor = [UIColor redColor];
     }];
